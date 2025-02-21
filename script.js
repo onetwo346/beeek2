@@ -1,185 +1,201 @@
-/* Flying Birds Animation */
-.flying-birds {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none; /* Ensure birds don't interfere with clicks */
-  z-index: -1; /* Place birds behind the content */
-}
+document.addEventListener("DOMContentLoaded", () => {
+  const descriptionPage = document.getElementById("description-page");
+  const mainPage = document.getElementById("main-page");
+  const pulsatingGetStartedButton = document.getElementById("pulsating-get-started");
+  const fileInput = document.getElementById("file-input");
+  const convertButton = document.getElementById("convert");
+  const textArea = document.getElementById("text-area");
+  const readAloudButton = document.getElementById("read-aloud");
+  const pauseAloudButton = document.getElementById("pause-aloud");
+  const stopAloudButton = document.getElementById("stop-aloud");
+  const clearTextButton = document.getElementById("clear-text");
+  const rearrangeTextButton = document.getElementById("rearrange-text");
+  const voiceSelect = document.getElementById("voice-select");
+  const speedControl = document.getElementById("speed-control");
+  const speedValue = document.getElementById("speed-value");
 
-.bird-container {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-}
+  let speech = null;
+  let voices = [];
+  let isSpeaking = false;
+  let userInteracted = false;
 
-.bird {
-  position: absolute;
-  width: 30px;
-  height: 30px;
-  background: url('bird-icon.png') no-repeat center center; /* Add your bird icon here */
-  background-size: contain;
-  animation: fly 10s linear infinite;
-}
+  // Ensure user interaction for iOS
+  const ensureUserInteraction = () => {
+    if (!userInteracted) {
+      userInteracted = true;
+      const unlockSpeech = new SpeechSynthesisUtterance("");
+      speechSynthesis.speak(unlockSpeech);
+    }
+  };
 
-.bird:nth-child(1) {
-  top: 10%;
-  left: -50px;
-  animation-delay: 0s;
-}
+  // Switch to main page when "Get Started" is clicked
+  pulsatingGetStartedButton.addEventListener("click", () => {
+    descriptionPage.classList.add("hidden");
+    mainPage.classList.remove("hidden");
+    ensureUserInteraction();
+  });
 
-.bird:nth-child(2) {
-  top: 30%;
-  left: -50px;
-  animation-delay: 2s;
-}
+  // Convert uploaded file to text
+  convertButton.addEventListener("click", async () => {
+    const file = fileInput.files[0];
+    if (!file) {
+      alert("Please upload a file.");
+      return;
+    }
 
-.bird:nth-child(3) {
-  top: 50%;
-  left: -50px;
-  animation-delay: 4s;
-}
+    const fileExtension = file.name.split(".").pop().toLowerCase();
 
-.bird:nth-child(4) {
-  top: 70%;
-  left: -50px;
-  animation-delay: 6s;
-}
+    if (fileExtension === "txt") {
+      const reader = new FileReader();
+      reader.onload = () => {
+        textArea.value = reader.result;
+      };
+      reader.readAsText(file);
+    } else if (fileExtension === "pdf") {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const typedArray = new Uint8Array(reader.result);
+        try {
+          const pdf = await pdfjsLib.getDocument(typedArray).promise;
+          let fullText = "";
+          for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+            const page = await pdf.getPage(pageNumber);
+            const textContent = await page.getTextContent();
+            const pageText = textContent.items.map((item) => item.str).join(" ");
+            fullText += pageText + "\n";
+          }
+          textArea.value = fullText;
+        } catch (error) {
+          alert("Failed to process PDF. Please try again.");
+          console.error("PDF processing error:", error);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      alert("Unsupported file type. Please upload a TXT or PDF file.");
+    }
+  });
 
-@keyframes fly {
-  0% {
-    transform: translateX(-100%) translateY(0) rotate(0deg);
-  }
-  50% {
-    transform: translateX(50%) translateY(-20px) rotate(10deg);
-  }
-  100% {
-    transform: translateX(200%) translateY(0) rotate(0deg);
-  }
-}
+  // Load available voices for text-to-speech
+  const loadVoices = () => {
+    voices = speechSynthesis.getVoices();
+    voiceSelect.innerHTML = "";
+    voices.forEach((voice) => {
+      if (voice.lang.includes("en")) { // Filter only English voices
+        const option = document.createElement("option");
+        option.value = voice.name;
+        option.textContent = voice.name;
+        voiceSelect.appendChild(option);
+      }
+    });
+  };
 
-/* Rest of the CSS */
-body {
-  font-family: 'Arial', sans-serif;
-  margin: 0;
-  padding: 0;
-  background-color: #f4f4f9;
-  color: #333;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 100vh;
-}
+  speechSynthesis.onvoiceschanged = loadVoices;
+  loadVoices();
 
-#description-page {
-  text-align: center;
-  max-width: 600px;
-  padding: 20px;
-  background: white;
-  border-radius: 10px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-  position: relative;
-  z-index: 1; /* Ensure description page is above birds */
-}
+  // Function to speak the text
+  const speakText = (text) => {
+    const selectedVoice = voices.find((voice) => voice.name === voiceSelect.value);
+    const speed = parseFloat(speedControl.value);
 
-#description-page h1 {
-  font-size: 2.5rem;
-  color: #6200ea;
-  margin-bottom: 20px;
-}
+    speech = new SpeechSynthesisUtterance(text);
+    speech.voice = selectedVoice || voices[0]; // Fallback to the first available voice
+    speech.rate = speed;
 
-#description-page p {
-  font-size: 1.1rem;
-  line-height: 1.6;
-  margin-bottom: 20px;
-}
+    // Assign event listeners to handle iOS quirks
+    speech.onstart = () => {
+      isSpeaking = true;
+      pauseAloudButton.disabled = false;
+      stopAloudButton.disabled = false;
+      pauseAloudButton.textContent = "Pause";
+    };
 
-#pulsating-get-started {
-  background-color: #6200ea;
-  color: white;
-  border: none;
-  padding: 15px 30px;
-  border-radius: 50px;
-  font-size: 1.2rem;
-  cursor: pointer;
-  animation: pulsate 1.5s infinite;
-  transition: background-color 0.3s ease;
-}
+    speech.onend = () => {
+      isSpeaking = false;
+      pauseAloudButton.disabled = true;
+      stopAloudButton.disabled = true;
+      pauseAloudButton.textContent = "Pause";
+    };
 
-@keyframes pulsate {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.1); }
-  100% { transform: scale(1); }
-}
+    // Speak the text
+    speechSynthesis.speak(speech);
+  };
 
-#pulsating-get-started:hover {
-  background-color: #3700b3;
-}
+  // Read the text aloud with text-to-speech
+  readAloudButton.addEventListener("click", () => {
+    ensureUserInteraction(); // Ensure iOS speech works
+    const text = textArea.value.trim();
+    if (!text) {
+      alert("Please enter or convert text to read aloud.");
+      return;
+    }
 
-#main-page {
-  width: 100%;
-  max-width: 800px;
-  margin: 20px;
-  background: white;
-  border-radius: 10px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-}
+    // Cancel any existing speech to prevent overlapping
+    speechSynthesis.cancel();
 
-header {
-  background-color: #6200ea;
-  color: white;
-  padding: 20px;
-  text-align: center;
-  border-radius: 10px 10px 0 0;
-}
+    // Speak the text
+    speakText(text);
+  });
 
-header h1 {
-  margin: 0;
-}
+  // Pause or resume text-to-speech
+  pauseAloudButton.addEventListener("click", () => {
+    if (isSpeaking) {
+      speechSynthesis.pause();
+      pauseAloudButton.textContent = "Resume";
+    } else if (speechSynthesis.paused) {
+      speechSynthesis.resume();
+      pauseAloudButton.textContent = "Pause";
+    }
+  });
 
-#upload-section {
-  padding: 20px;
-}
+  // Stop text-to-speech
+  stopAloudButton.addEventListener("click", () => {
+    speechSynthesis.cancel();
+    isSpeaking = false;
+    pauseAloudButton.disabled = true;
+    stopAloudButton.disabled = true;
+    pauseAloudButton.textContent = "Pause";
+  });
 
-textarea {
-  width: calc(100% - 20px); /* Adjust width to prevent overflow */
-  height: 200px;
-  margin: 10px 0;
-  padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 5px;
-  font-size: 16px;
-  resize: vertical;
-  box-sizing: border-box; /* Ensure padding doesn't affect width */
-}
+  // Clear text area and reset all controls
+  clearTextButton.addEventListener("click", () => {
+    textArea.value = "";
+    speechSynthesis.cancel();
+    pauseAloudButton.disabled = true;
+    stopAloudButton.disabled = true;
+    pauseAloudButton.textContent = "Pause";
+  });
 
-.controls {
-  display: flex;
-  flex-wrap: wrap; /* Wrap buttons on smaller screens */
-  gap: 10px; /* Add spacing between buttons */
-  margin-top: 10px;
-}
+  // Rearrange and clean up text
+  rearrangeTextButton.addEventListener("click", () => {
+    const text = textArea.value.trim();
+    if (!text) {
+      alert("Please enter or convert text for rearranging.");
+      return;
+    }
 
-.voice-controls {
-  display: flex;
-  flex-direction: column;
-  margin-top: 10px;
-  gap: 10px; /* Add spacing between controls */
-}
+    const fixText = (input) => {
+      return input
+        .replace(/\s+/g, " ") // Normalize spaces
+        .replace(/([.?!])([^\s])/g, "$1 $2") // Add space after punctuation
+        .replace(/(\w),(\w)/g, "$1, $2") // Add space after commas
+        .replace(/(\w)([“”‘’])/g, "$1 $2") // Ensure space before quotes
+        .replace(/([“”‘’])(\w)/g, "$1 $2") // Ensure space after quotes
+        .replace(/(\.\.\.)(\w)/g, "$1 $2") // Add space after ellipses
+        .replace(/([.?!])\s+([a-z])/g, (match, p1, p2) => `${p1} ${p2.toUpperCase()}`) // Capitalize after punctuation
+        .replace(/^\s*[a-z]/, (match) => match.toUpperCase()) // Capitalize first letter
+        .replace(/\si\s/g, " I ") // Capitalize standalone "i"
+        .replace(/\s+([.?!])/g, "$1") // Remove space before punctuation
+        .trim(); // Trim trailing spaces
+    };
 
-footer {
-  padding: 10px;
-  background-color: #6200ea;
-  color: white;
-  text-align: center;
-  border-radius: 0 0 10px 10px;
-  width: 100%;
-}
+    const fixedText = fixText(text);
+    textArea.value = fixedText;
+    alert("Text has been perfectly edited.");
+  });
 
-.hidden {
-  display: none;
-}
+  // Display speed value for text-to-speech
+  speedControl.addEventListener("input", () => {
+    speedValue.textContent = speedControl.value;
+  });
+});
