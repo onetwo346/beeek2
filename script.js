@@ -19,7 +19,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let isSpeaking = false;
   let userInteracted = false;
 
-  // Ensure user interaction for iOS (Fixes speech issue)
+  // Ensure user interaction for iOS playback
   const ensureUserInteraction = () => {
     if (!userInteracted) {
       userInteracted = true;
@@ -35,7 +35,7 @@ document.addEventListener("DOMContentLoaded", () => {
     ensureUserInteraction();
   });
 
-  // Improved PDF and TXT Conversion
+  // Optimized PDF and TXT Conversion
   convertButton.addEventListener("click", async () => {
     const file = fileInput.files[0];
     if (!file) {
@@ -80,7 +80,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // Improved voice loading (Fix for Google voices not appearing on laptops)
+  // Improved voice loading (Fix for voices not appearing)
   const loadVoices = () => {
     voices = speechSynthesis.getVoices();
     voiceSelect.innerHTML = "";
@@ -97,7 +97,7 @@ document.addEventListener("DOMContentLoaded", () => {
       console.error("No voices loaded. Try reloading the page.");
     }
 
-    // Automatically select a Google/Microsoft/Samantha voice if available
+    // Automatically select a Google/Microsoft/Siri voice if available
     const preferredVoices = voices.filter((v) =>
       v.name.includes("Google") || v.name.includes("Microsoft") || v.name.includes("Samantha")
     );
@@ -116,9 +116,7 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    // Ensure user interaction before speaking (Fix for iPhones)
     ensureUserInteraction();
-
     speechSynthesis.cancel(); // Cancel any ongoing speech
 
     const selectedVoice = voices.find((voice) => voice.name === voiceSelect.value);
@@ -127,7 +125,7 @@ document.addEventListener("DOMContentLoaded", () => {
     speech = new SpeechSynthesisUtterance(text);
     speech.voice = selectedVoice || voices[0]; // Fallback to first voice
     speech.rate = speed;
-    speech.pitch = 1.2;
+    speech.pitch = 1;
     speech.volume = 1;
 
     speech.onstart = () => {
@@ -181,4 +179,34 @@ document.addEventListener("DOMContentLoaded", () => {
   speedControl.addEventListener("input", () => {
     speedValue.textContent = speedControl.value;
   });
+
+  // AI Rearrange Feature (NLP-based)
+  rearrangeTextButton.addEventListener("click", () => {
+    let text = textArea.value.trim();
+    if (!text) {
+      alert("No text to rearrange.");
+      return;
+    }
+
+    fetch("https://api.text-processing.com/rearrange", {  // Replace with actual NLP API
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ text: text })
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.rearranged_text) {
+        textArea.value = data.rearranged_text;
+      } else {
+        alert("Failed to rearrange text.");
+      }
+    })
+    .catch(error => {
+      console.error("AI rearrange error:", error);
+      alert("AI rearrange feature is temporarily unavailable.");
+    });
+  });
+
 });
